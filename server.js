@@ -20,121 +20,56 @@ const pool = new Pool({
     connectionTimeoutMillis: 5000,
 });
 
-// Verificar conexión a BD
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('Error connecting to database:', err.stack);
-    } else {
-        console.log('Connected to database successfully');
-        release();
-    }
-});
+// ==================== USUARIOS ====================\
 
-// ==================== USUARIOS ====================
-
-// GET - Obtener usuario por ID
+// GET - Obtener usuario
 app.get('/users/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
-    
-    if (isNaN(id)) {
-        return res.status(400).json({ error: 'ID inválido' });
-    }
-    
     try {
-        const result = await pool.query('SELECT id, email, password FROM users WHERE id = $1', [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-        
+        const result = await pool.query('SELECT id, email, password FROM users WHERE id = $1', [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error al obtener usuario' });
     }
 });
 
 // POST - Crear usuario
 app.post('/users', async (req, res) => {
     const { email, password } = req.body;
-    
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email y password son requeridos' });
-    }
-    
     try {
         const result = await pool.query(
             'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, password',
             [email, password]
         );
-        
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Error al crear el usuario' });
+        res.status(500).json({ error: 'Error al crear usuario' });
     }
 });
 
-// PUT - Actualizar usuario
+// PUT - Actualizar usuario (Lógica simplificada: siempre van ambos campos)
 app.put('/users/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
     const { email, password } = req.body;
-    
-    if (isNaN(id)) {
-        return res.status(400).json({ error: 'ID inválido' });
-    }
-    
-    if (!email && !password) {
-        return res.status(400).json({ error: 'Email o password son requeridos para actualizar' });
-    }
-    
     try {
-        let query;
-        let params;
-        
-        if (email && password) {
-            query = 'UPDATE users SET email = $1, password = $2 WHERE id = $3 RETURNING id, email, password';
-            params = [email, password, id];
-        } else if (email) {
-            query = 'UPDATE users SET email = $1 WHERE id = $2 RETURNING id, email, password';
-            params = [email, id];
-        } else {
-            query = 'UPDATE users SET password = $1 WHERE id = $2 RETURNING id, email, password';
-            params = [password, id];
-        }
-        
-        const result = await pool.query(query, params);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-        
+        const result = await pool.query(
+            'UPDATE users SET email = $1, password = $2 WHERE id = $3 RETURNING id, email, password',
+            [email, password, req.params.id]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Error al actualizar el usuario' });
+        res.status(500).json({ error: 'Error al actualizar usuario' });
     }
 });
 
 // DELETE - Eliminar usuario
 app.delete('/users/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
-    
-    if (isNaN(id)) {
-        return res.status(400).json({ error: 'ID inválido' });
-    }
-    
     try {
-        const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-        
-        res.json({ message: 'Usuario eliminado correctamente', id: result.rows[0].id });
+        const result = await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ message: 'Usuario eliminado' });
     } catch (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Error al eliminar el usuario' });
+        res.status(500).json({ error: 'Error al eliminar usuario' });
     }
 });
 
